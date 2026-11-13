@@ -1,10 +1,34 @@
 {
   "keys": [
     {
-      "name": "Pemilik",
-      "key": "VIP-2026-001",
-      "active": true,
-      "expires": "2026-12-31"
+      "name": "Owner",
+      "key": "KEY-JIRUN-2026",
+      "duration": "permanent",
+      "active": true
+    },
+    {
+      "name": "Admin",
+      "key": "KEY-TAUFIK-2026",
+      "duration": "permanent",
+      "active": true
+    },
+    {
+      "name": "Key 1 Menit",
+      "key": "TES-1MENIT",
+      "duration": "1m",
+      "active": true
+    },
+    {
+      "name": "Key 1 Jam",
+      "key": "PAKET-1JAM",
+      "duration": "1h",
+      "active": true
+    },
+    {
+      "name": "Key 24 Jam",
+      "key": "PAKET-24JAM",
+      "duration": "24h",
+      "active": true
     }
   ]
 }
