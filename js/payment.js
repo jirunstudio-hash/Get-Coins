@@ -210,4 +210,10 @@
     });
 
     updateBuyButton();
+
+    if (Array.isArray(window.AppCleanups)) {
+        window.AppCleanups.push(() => {
+            clearInterval(countdownInterval);
+        });
+    }
 })();
