@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get Coins</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- LAYAR LOGIN KEY -->
+<div class="login-screen" id="loginScreen">
+    <div class="login-card">
+        <div class="login-logo">
+            <img
+                src="https://static.vecteezy.com/system/resources/previews/020/964/382/original/tiktok-circle-icon-for-web-design-free-png.png"
+                alt="Logo">
+        </div>
+        <h1>Verifikasi Akses</h1>
+        <p class="login-subtitle">Masukkan Key akses untuk membuka halaman</p>
+
+        <form id="loginForm" autocomplete="off">
+            <input
+                type="password"
+                id="keyInput"
+                class="login-input"
+                placeholder="Masukkan Key Anda..."
+                required>
+            <button type="submit" class="login-btn" id="loginBtn">
+                Masuk
+            </button>
+        </form>
+
+        <p class="login-status" id="loginStatus"></p>
+    </div>
+</div>
+
+<!-- TEMPAT MOUNT APLIKASI SETELAH LOGIN VALID -->
+<div id="appMount"></div>
+
+<!-- TEMPLATE APLIKASI (TIDAK DIRENDER SEBELUM KEY VALID) -->
+<template id="appTemplate">
+    <div class="app">
+
+        <!-- VIDEO & ONCAM -->
+        <section class="video-section">
+
+            <video id="mainVideo" autoplay muted loop playsinline></video>
+
+            <div class="video-placeholder" id="videoPlaceholder">
+                <div style="font-size:28px;">▶</div>
+                Pilih video atau nyalakan kamera via menu ⋮
+            </div>
+
+            <div class="video-menu">
+                <button class="video-menu-btn" id="videoMenuBtn">⋮</button>
+
+                <div class="video-menu-content" id="videoMenuContent">
+                    <button id="chooseVideoBtn">📁 Pilih video galeri</button>
+                    <button id="startCameraBtn">📷 Nyalakan Kamera (OnCam)</button>
+                    <button id="switchCameraBtn" style="display:none;">🔄 Ganti Kamera (Depan/Belakang)</button>
+                    <button id="stopCameraBtn" style="display:none;">⏹ Matikan Kamera</button>
+                    <button id="removeVideoBtn">✕ Hapus video</button>
+                    <button id="logoutBtn" style="color:#fe2c55;font-weight:600;">🔒 Keluar (Logout)</button>
+                </div>
+            </div>
+
+            <input type="file" id="videoFileInput"
+                class="video-file-input" accept="video/*">
+
+        </section>
+
+        <!-- GET COINS -->
+        <main class="coin-page">
+
+            <!-- BAR GIFT BERPUTAR TIAP 5 DETIK -->
+            <div class="gift-banner">
+                <div class="gift-ticker" id="giftTicker">
+                    <img id="giftIcon" referrerpolicy="no-referrer"
+                        src="https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/eba3a9bb85c33e017f3648eaf88d7189~tplv-obj.webp"
+                        alt="Gift">
+                    <span class="gift-arrow">→</span>
+                    <span class="gift-amount" id="giftAmount">1.000</span>
+                </div>
+            </div>
+
+            <!-- DETEKSI AKUN -->
+            <section class="account-area">
+
+                <div class="account-input">
+
+                    <img
+                        src="https://static.vecteezy.com/system/resources/previews/020/964/382/original/tiktok-circle-icon-for-web-design-free-png.png"
+                        alt="Logo">
+
+                    <input
+                        id="usernameInput"
+                        type="text"
+                        placeholder="Enter TikTok username"
+                        autocomplete="off">
+
+                    <div class="loading-slot" id="loadingSlot">
+                        <div class="loading-spinner"></div>
+                    </div>
+
+                </div>
+
+                <div class="account-status" id="accountStatus"></div>
+
+                <!-- KOTAK PROFIL TARGET -->
+                <div class="profile-card" id="profileCard">
+
+                    <img id="profileAvatar" referrerpolicy="no-referrer" alt="Foto profil">
+
+                    <div class="profile-info">
+
+                        <div class="profile-name">
+                            <span id="profileName">-</span>
+                            <span id="profileVerified" class="profile-verified" title="Verified">
+                                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="24" cy="24" r="22" fill="#20D5EC"/>
+                                    <path d="M14.5 24.5L21 31L34 17.5" stroke="#FFFFFF" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </span>
+                        </div>
+
+                        <div class="profile-username" id="profileUsername">-</div>
+
+                    </div>
+
+                    <div class="profile-stats">
+                        <span id="profileFollowers">0</span>
+                        <span>Followers</span>
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- PILIHAN COINS -->
+            <section class="recharge-section">
+
+                <div class="recharge-heading">
+                    <h2>Recharge</h2>
+                </div>
+
+                <p>
+                    <span class="red-text">Save around 25% with a lower third-party service fee.</span>
+                </p>
+
+                <div class="coin-options">
+
+                    <button class="coin-option selected"
+                        data-coins="30" data-price="0.31">
+                        <div class="coin-top">
+                            <img src="https://tikpopular.com/wp-content/coins.png" alt="">
+                            <strong>30</strong>
+                        </div>
+                        <small>$0.31</small>
+                    </button>
+
+                    <button class="coin-option"
+                        data-coins="350" data-price="3.65">
+                        <div class="coin-top">
+                            <img src="https://tikpopular.com/wp-content/coins.png" alt="">
+                            <strong>350</strong>
+                        </div>
+                        <small>$3.65</small>
+                    </button>
+
+                    <button class="coin-option"
+                        data-coins="700" data-price="7.25">
+                        <div class="coin-top">
+                            <img src="https://tikpopular.com/wp-content/coins.png" alt="">
+                            <strong>700</strong>
+                        </div>
+                        <small>$7.25</small>
+                    </button>
+
+                    <button class="coin-option"
+                        data-coins="1400" data-price="14.49">
+                        <div class="coin-top">
+                            <img src="https://tikpopular.com/wp-content/coins.png" alt="">
+                            <strong>1,400</strong>
+                        </div>
+                        <small>$14.49</small>
+                    </button>
+
+                    <button class="coin-option"
+                        data-coins="3500" data-price="36.20">
+                        <div class="coin-top">
+                            <img src="https://tikpopular.com/wp-content/coins.png" alt="">
+                            <strong>3,500</strong>
+                        </div>
+                        <small>$36.20</small>
+                    </button>
+
+                    <button class="coin-option custom-btn" id="customBtn">
+                        Custom
+                    </button>
+
+                </div>
+
+            </section>
+
+            <footer class="footer">
+
+                <div class="special-offer">
+                    <span>Special offer</span>
+                    <span>Unlock 5% cash back &gt;</span>
+                </div>
+
+                <button class="buy-button" id="buyButton">
+                    Buy for $0.31
+                </button>
+
+            </footer>
+
+        </main>
+    </div>
+
+    <!-- DIALOG MINTA IZIN KAMERA -->
+    <div class="overlay center-overlay" id="cameraPermissionModal">
+        <div class="permission-card">
+            <div class="permission-icon">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M23 7l-7 5 7 5V7z"/>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                </svg>
+            </div>
+            <h3>Izin Akses Kamera</h3>
+            <p>
+                Website membutuhkan izin akses kamera untuk menampilkan OnCam secara realtime. Tekan <strong>Izinkan Kamera</strong> lalu pilih <strong>Allow / Izinkan</strong> pada browser.
+            </p>
+            <div class="permission-actions">
+                <button type="button" class="btn-cancel-perm" id="cancelCamPermBtn">Batal</button>
+                <button type="button" class="btn-allow-perm" id="allowCamPermBtn">Izinkan Kamera</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOM KOIN -->
+    <div class="overlay" id="customModal">
+        <div class="modal">
+
+            <div class="modal-header">
+                <button class="back-btn" id="customBackBtn">←</button>
+                <h2>Custom</h2>
+                <div class="help-icon" style="border-color:#fe2c55;color:#fe2c55;">?</div>
+            </div>
+
+            <p style="font-size:13px;color:#666;margin-bottom:9px;font-weight:500;">
+                Coin Amount
+            </p>
+
+            <div class="coin-input-box">
+                <img src="https://tikpopular.com/wp-content/coins.png" alt="">
+                <input id="coinAmountInput" type="text"
+                    inputmode="numeric" value="0">
+            </div>
+
+            <p id="customUSD" style="font-size:15px;font-weight:500;margin-top:10px;color:#333;">
+                $0.00
+            </p>
+
+            <div class="keypad" id="keypad">
+                <button>1</button>
+                <button>2</button>
+                <button>3</button>
+                <button data-action="delete">⌫</button>
+                <button>4</button>
+                <button>5</button>
+                <button>6</button>
+                <button>000</button>
+                <button>7</button>
+                <button>8</button>
+                <button>9</button>
+                <button>0</button>
+            </div>
+
+            <div class="custom-modal-offer">
+                <span>Special offer</span>
+                <span>Unlock 5% cash back &gt;</span>
+            </div>
+
+            <div class="total-row">
+                <span>Total</span>
+                <span id="customTotal">$0.00</span>
+            </div>
+
+            <button class="modal-action" id="customContinue">
+                Recharge
+            </button>
+
+        </div>
+    </div>
+
+    <!-- ORDER SUMMARY -->
+    <div class="overlay" id="orderModal">
+        <div class="modal">
+
+            <div class="modal-header">
+                <button class="back-btn" id="orderBackBtn">←</button>
+                <h2>Order summary</h2>
+                <div class="help-icon">?</div>
+            </div>
+
+            <div class="secure-payment">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#388e3c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="M9 12l2 2 4-4"/>
+                </svg>
+                <span>Secure payment</span>
+            </div>
+
+            <div class="order-details">
+                <div class="detail-row">
+                    <span>Account</span>
+                    <span id="orderAccount">-</span>
+                </div>
+                <div class="detail-row">
+                    <span id="orderCoins">30 Coins</span>
+                    <span id="orderPrice">$0.31</span>
+                </div>
+            </div>
+
+            <div class="payment-method-section">
+                <h4>Payment method</h4>
+
+                <div class="payment-option selected" data-method="card">
+                    <div class="payment-icon">
+                        <svg width="24" height="18" viewBox="0 0 24 18" fill="none" stroke="#333" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="1" y="1" width="22" height="16" rx="2"/>
+                            <line x1="1" y1="6" x2="23" y2="6"/>
+                            <line x1="5" y1="12" x2="9" y2="12"/>
+                        </svg>
+                    </div>
+                    <span>Add Credit Or Debit Card</span>
+                    <div class="dot"></div>
+                </div>
+
+                <div class="payment-option" data-method="applepay">
+                    <div class="payment-icon">
+                        <svg width="24" height="18" viewBox="0 0 24 24" fill="#000">
+                            <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z"/>
+                        </svg>
+                    </div>
+                    <span>Apple Pay</span>
+                    <div class="dot"></div>
+                </div>
+
+                <p class="policy-text">
+                    By tapping <strong>Pay</strong> to make a purchase, you acknowledge that you are purchasing a limited license to access this virtual item subject to policy
+                </p>
+            </div>
+
+            <div class="total-row">
+                <span>Total</span>
+                <span id="orderTotal">$0.31</span>
+            </div>
+
+            <button class="pay-btn" id="payNowBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="M9 12l2 2 4-4"/>
+                </svg>
+                Pay now
+            </button>
+
+        </div>
+    </div>
+
+    <!-- LOADER PEMBAYARAN -->
+    <div class="overlay center-overlay" id="loaderModal">
+        <div class="loader-container">
+            <div class="tiktok-loader">
+                <div class="dot red"></div>
+                <div class="dot cyan"></div>
+            </div>
+            <p id="processingMessage">Processing your payment...</p>
+            <p id="processingSubMessage">This could take a few seconds.</p>
+            <p id="countdownTimer">05:00</p>
+        </div>
+    </div>
+
+    <!-- PEMBAYARAN BERHASIL -->
+    <div class="overlay center-overlay" id="successModal">
+        <div class="success-container">
+            <div class="success-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+            </div>
+            <h1>Payment Completed</h1>
+            <p class="success-message">
+                <strong id="successCoins">0</strong> coins were sent to
+                <strong id="successUsername">Guest</strong>.<br>
+                This operation has been completed. It will be processed within 24 hours.
+            </p>
+            <button class="go-back-btn" id="goBackBtn">Go back</button>
+        </div>
+    </div>
+</template>
+
+<script src="js/auth.js"></script>
+</body>
+</html>
