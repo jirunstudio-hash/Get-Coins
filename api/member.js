@@ -52,6 +52,7 @@ module.exports = async function handler(req, res) {
         const action = body.action || 'login';
         const inputKey = String(body.key || '').trim();
         const device = String(body.device || '').trim().slice(0, 80);
+        const deviceId = String(body.deviceId || 'default').trim().slice(0, 64);
 
         if (!inputKey) {
             return res.status(400).json({ valid: false, message: 'Masukkan Key terlebih dahulu.' });
@@ -70,9 +71,19 @@ module.exports = async function handler(req, res) {
 
         const item = keys[idx];
         const now = Date.now();
+        if (!Array.isArray(item.sessions)) {
+            item.sessions = [];
+        }
 
         if (action === 'logout') {
-            item.lastSeen = 0;
+            const sIdx = item.sessions.findIndex(s => s && s.deviceId === deviceId);
+            if (sIdx !== -1) {
+                item.sessions[sIdx].lastSeen = 0;
+            }
+            const stillAnyOnline = item.sessions.some(s => s && s.lastSeen && (now - s.lastSeen < 35000));
+            if (!stillAnyOnline) {
+                item.lastSeen = 0;
+            }
             keys[idx] = item;
             await writeBin(keys);
             return res.status(200).json({ ok: true });
@@ -93,12 +104,29 @@ module.exports = async function handler(req, res) {
             if (now >= item.expiresAt) {
                 item.active = false;
                 item.lastSeen = 0;
+                item.sessions = item.sessions.map(s => ({ ...s, lastSeen: 0 }));
                 keys[idx] = item;
                 await writeBin(keys);
                 return res.status(200).json({
                     valid: false,
                     message: 'Waktu Key sudah habis dan tidak dapat digunakan lagi.'
                 });
+            }
+        }
+
+        const existingSessionIdx = item.sessions.findIndex(s => s && s.deviceId === deviceId);
+        if (existingSessionIdx !== -1) {
+            item.sessions[existingSessionIdx].lastSeen = now;
+            if (device) item.sessions[existingSessionIdx].device = device;
+        } else {
+            item.sessions.unshift({
+                deviceId,
+                device: device || 'Perangkat Tidak Dikenal',
+                firstSeen: now,
+                lastSeen: now
+            });
+            if (item.sessions.length > 10) {
+                item.sessions = item.sessions.slice(0, 10);
             }
         }
 
