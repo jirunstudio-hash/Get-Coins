@@ -53,7 +53,7 @@ module.exports = async function handler(req, res) {
                 return res.status(400).json({ ok: false, message: 'Kode Key wajib diisi.' });
             }
 
-            if (keys.some(k => k && k.key === key)) {
+            if (keys.some(k => k && String(k.key).trim().toLowerCase() === key.toLowerCase())) {
                 return res.status(400).json({ ok: false, message: 'Kode Key sudah ada, gunakan kode lain.' });
             }
 
@@ -63,6 +63,7 @@ module.exports = async function handler(req, res) {
                 key,
                 duration,
                 device: '-',
+                sessions: [],
                 active: true,
                 createdAt: now,
                 startedAt: null,
@@ -82,7 +83,12 @@ module.exports = async function handler(req, res) {
                     });
                 }
                 item.active = !item.active;
-                if (!item.active) item.lastSeen = 0;
+                if (!item.active) {
+                    item.lastSeen = 0;
+                    if (Array.isArray(item.sessions)) {
+                        item.sessions = item.sessions.map(s => ({ ...s, lastSeen: 0 }));
+                    }
+                }
                 await writeBin(keys);
             }
         } else if (action === 'delete') {
@@ -93,13 +99,39 @@ module.exports = async function handler(req, res) {
 
         const formatted = keys.map(item => {
             const isExpired = Boolean(item.expiresAt && now >= item.expiresAt);
-            const isOnline = Boolean(!isExpired && item.active && item.lastSeen && (now - item.lastSeen < 35000));
+
+            let rawSessions = Array.isArray(item.sessions) ? item.sessions : [];
+            if (rawSessions.length === 0 && item.device && item.device !== '-') {
+                rawSessions = [{
+                    deviceId: 'legacy',
+                    device: item.device,
+                    lastSeen: item.lastSeen || 0
+                }];
+            }
+
+            const sessions = rawSessions
+                .map(s => ({
+                    deviceId: s.deviceId,
+                    device: s.device || 'Perangkat Tidak Dikenal',
+                    isOnline: Boolean(!isExpired && item.active && s.lastSeen && (now - s.lastSeen < 35000)),
+                    lastSeen: s.lastSeen || 0
+                }))
+                .sort((a, b) => {
+                    if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
+                    return b.lastSeen - a.lastSeen;
+                });
+
+            const onlineCount = sessions.filter(s => s.isOnline).length;
+            const isOnline = onlineCount > 0;
+
             return {
                 id: item.id,
                 name: item.name,
                 key: item.key,
                 duration: item.duration || 'permanent',
                 device: item.device || '-',
+                sessions,
+                onlineCount,
                 active: Boolean(item.active) && !isExpired,
                 isExpired,
                 isOnline,
