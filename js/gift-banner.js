@@ -32,15 +32,20 @@
         img.src = item.icon;
     });
 
-    setInterval(() => {
+    const intervalId = setInterval(() => {
         giftIndex = (giftIndex + 1) % giftItems.length;
         const next = giftItems[giftIndex];
 
         giftTicker.classList.add('switching');
         setTimeout(() => {
+            if (!document.body.contains(giftTicker)) return;
             giftIcon.src = next.icon;
             giftAmount.textContent = next.amount;
             giftTicker.classList.remove('switching');
         }, 220);
     }, 5000);
+
+    if (Array.isArray(window.AppCleanups)) {
+        window.AppCleanups.push(() => clearInterval(intervalId));
+    }
 })();
