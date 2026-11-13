@@ -27,13 +27,76 @@
         return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
     }
 
+    async function getDeviceName() {
+        const ua = navigator.userAgent || '';
+        let browser = 'Browser';
+        if (/Edg/i.test(ua)) browser = 'Edge';
+        else if (/OPR|Opera/i.test(ua)) browser = 'Opera';
+        else if (/Firefox|FxiOS/i.test(ua)) browser = 'Firefox';
+        else if (/Chrome|CriOS/i.test(ua)) browser = 'Chrome';
+        else if (/Safari/i.test(ua)) browser = 'Safari';
+
+        let os = 'Perangkat Lain';
+        let type = 'Perangkat';
+        let model = '';
+
+        if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+            try {
+                const hints = await navigator.userAgentData.getHighEntropyValues(['model', 'platform']);
+                if (hints.model) model = hints.model.trim();
+                if (hints.platform) os = hints.platform;
+            } catch {}
+        }
+
+        if (/iPhone/i.test(ua)) {
+            type = 'HP';
+            os = 'iPhone (iOS)';
+        } else if (/iPad/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1)) {
+            type = 'Tablet';
+            os = 'iPad';
+        } else if (/Android/i.test(ua) || os === 'Android') {
+            type = 'HP';
+            os = 'Android';
+            if (!model) {
+                const m = ua.match(/Android[^;]*;\s*([^)]+)\)/i);
+                if (m && m[1]) {
+                    const rawModel = m[1].split('Build/')[0].trim();
+                    if (rawModel && rawModel !== 'K') model = rawModel;
+                }
+            }
+        } else if (/Windows/i.test(ua) || os === 'Windows') {
+            type = 'Laptop/PC';
+            os = 'Windows';
+        } else if (/Macintosh|Mac OS/i.test(ua) || os === 'macOS') {
+            type = 'Laptop/PC';
+            os = 'macOS';
+        } else if (/CrOS/i.test(ua) || os === 'Chrome OS') {
+            type = 'Laptop/PC';
+            os = 'ChromeOS';
+        } else if (/Linux/i.test(ua) || os === 'Linux') {
+            type = 'Laptop/PC';
+            os = 'Linux';
+        }
+
+        const detail = model ? `${os} (${model})` : os;
+        return `${type} • ${detail} • ${browser}`;
+    }
+
     async function callMemberApi(action, key) {
+        const device = action === 'logout' ? '' : await getDeviceName();
         const res = await fetch('/api/member', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, key })
+            body: JSON.stringify({ action, key, device })
         });
-        return await res.json();
+        const text = await res.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch {
+            throw new Error('Server /api/member tidak ditemukan (HTTP ' + res.status + ').');
+        }
+        return data;
     }
 
     function cleanupApp() {
@@ -158,8 +221,8 @@
             }
             localStorage.setItem(STORAGE_SESSION, inputKey);
             await unlockApp(inputKey, res);
-        } catch {
-            loginStatus.textContent = 'Gagal terhubung ke server.';
+        } catch (err) {
+            loginStatus.textContent = err.message || 'Gagal terhubung ke server.';
         } finally {
             loginBtn.disabled = false;
             loginBtn.textContent = 'Masuk';
@@ -183,9 +246,9 @@
                 loginStatus.style.color = '#fe2c55';
                 loginStatus.textContent = res.message || 'Sesi berakhir.';
             }
-        } catch {
+        } catch (err) {
             loginStatus.style.color = '#fe2c55';
-            loginStatus.textContent = 'Gagal memverifikasi sesi.';
+            loginStatus.textContent = err.message || 'Gagal memverifikasi sesi.';
         } finally {
             loginBtn.disabled = false;
         }
