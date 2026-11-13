@@ -1,8 +1,5 @@
 (function () {
-    const GITHUB_KEYS_URL = './keys.json';
-    const STORAGE_SESSION = 'app_access_key_v2';
-    const STORAGE_TIMERS = 'app_key_timers_v2';
-    const STORAGE_BURNED = 'app_burned_keys_v2';
+    const STORAGE_SESSION = 'app_member_key_v3';
 
     const loginScreen = document.getElementById('loginScreen');
     const loginForm = document.getElementById('loginForm');
@@ -13,55 +10,10 @@
     const appTemplate = document.getElementById('appTemplate');
 
     let expiryWatchInterval = null;
-    let remoteCheckInterval = null;
+    let heartbeatInterval = null;
+    let activeKeyValue = '';
 
     window.AppCleanups = [];
-
-    function readJSON(key, fallback) {
-        try {
-            const raw = localStorage.getItem(key);
-            return raw ? JSON.parse(raw) : fallback;
-        } catch {
-            return fallback;
-        }
-    }
-
-    function writeJSON(key, val) {
-        try {
-            localStorage.setItem(key, JSON.stringify(val));
-        } catch {}
-    }
-
-    async function sha256(text) {
-        if (!window.crypto || !crypto.subtle) return text;
-        const data = new TextEncoder().encode(text);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        return Array.from(new Uint8Array(hashBuffer))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-    }
-
-    function parseDurationMs(duration) {
-        if (!duration) return null;
-        const s = String(duration).trim().toLowerCase();
-        if (!s || s === 'permanent' || s === 'permanen') return null;
-
-        const match = s.match(/^(\d+)\s*(m|h|d)$/);
-        if (!match) return null;
-
-        const val = Number(match[1]);
-        const unit = match[2];
-        if (unit === 'm') return val * 60 * 1000;
-        if (unit === 'h') return val * 60 * 60 * 1000;
-        if (unit === 'd') return val * 24 * 60 * 60 * 1000;
-        return null;
-    }
-
-    function isDateExpired(expiresStr) {
-        if (!expiresStr) return false;
-        const today = new Date().toISOString().slice(0, 10);
-        return today > String(expiresStr).trim();
-    }
 
     function formatRemaining(ms) {
         if (ms <= 0) return '00:00';
@@ -69,130 +21,27 @@
         const hrs = Math.floor(totalSec / 3600);
         const mins = Math.floor((totalSec % 3600) / 60);
         const secs = totalSec % 60;
-
         if (hrs > 0) {
-            return (
-                String(hrs).padStart(2, '0') + ':' +
-                String(mins).padStart(2, '0') + ':' +
-                String(secs).padStart(2, '0')
-            );
+            return String(hrs).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
         }
-        return (
-            String(mins).padStart(2, '0') + ':' +
-            String(secs).padStart(2, '0')
-        );
+        return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
     }
 
-    function burnKey(keyId) {
-        const burned = readJSON(STORAGE_BURNED, {});
-        burned[keyId] = Date.now();
-        writeJSON(STORAGE_BURNED, burned);
-    }
-
-    function isKeyBurned(keyId) {
-        const burned = readJSON(STORAGE_BURNED, {});
-        return Boolean(burned[keyId]);
-    }
-
-    async function validateKeyFromGitHub(rawKey) {
-        const input = String(rawKey || '').trim();
-        if (!input) {
-            return { valid: false, message: 'Masukkan Key terlebih dahulu.' };
-        }
-
-        const response = await fetch(GITHUB_KEYS_URL + '?t=' + Date.now(), {
-            cache: 'no-store'
+    async function callMemberApi(action, key) {
+        const res = await fetch('/api/member', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, key })
         });
-
-        if (!response.ok) {
-            throw new Error('Gagal mengambil daftar Key dari GitHub.');
-        }
-
-        const data = await response.json();
-        const list = Array.isArray(data.keys) ? data.keys : [];
-        const inputHash = await sha256(input);
-
-        for (const item of list) {
-            if (!item || typeof item !== 'object') continue;
-
-            const matchPlain = typeof item.key === 'string' && item.key === input;
-            const matchHash = typeof item.hash === 'string' && item.hash.toLowerCase() === inputHash;
-
-            if (matchPlain || matchHash) {
-                const durationMs = parseDurationMs(item.duration);
-                const keyId = (item.hash || inputHash) + ':' + (item.duration || 'permanent');
-
-                if (item.active === false) {
-                    return { valid: false, message: 'Key ini sedang dinonaktifkan.' };
-                }
-
-                if (isDateExpired(item.expires)) {
-                    return { valid: false, message: 'Key sudah kedaluwarsa.' };
-                }
-
-                if (durationMs !== null) {
-                    if (isKeyBurned(keyId)) {
-                        return {
-                            valid: false,
-                            message: 'Key ini sudah habis masa berlakunya dan tidak dapat digunakan lagi. Buat Key baru di GitHub.'
-                        };
-                    }
-
-                    const timers = readJSON(STORAGE_TIMERS, {});
-                    const now = Date.now();
-                    let record = timers[keyId];
-
-                    if (!record) {
-                        record = {
-                            startedAt: now,
-                            expiresAt: now + durationMs
-                        };
-                        timers[keyId] = record;
-                        writeJSON(STORAGE_TIMERS, timers);
-                    }
-
-                    if (now >= record.expiresAt) {
-                        burnKey(keyId);
-                        return {
-                            valid: false,
-                            message: 'Waktu Key sudah habis dan tidak dapat digunakan lagi. Buat Key baru di GitHub.'
-                        };
-                    }
-
-                    return {
-                        valid: true,
-                        keyId: keyId,
-                        expiresAt: record.expiresAt,
-                        isPermanent: false
-                    };
-                }
-
-                return {
-                    valid: true,
-                    keyId: keyId,
-                    expiresAt: null,
-                    isPermanent: true
-                };
-            }
-        }
-
-        return { valid: false, message: 'Key tidak valid atau tidak terdaftar.' };
+        return await res.json();
     }
 
     function cleanupApp() {
-        if (expiryWatchInterval) {
-            clearInterval(expiryWatchInterval);
-            expiryWatchInterval = null;
-        }
-        if (remoteCheckInterval) {
-            clearInterval(remoteCheckInterval);
-            remoteCheckInterval = null;
-        }
+        if (expiryWatchInterval) { clearInterval(expiryWatchInterval); expiryWatchInterval = null; }
+        if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
 
         if (Array.isArray(window.AppCleanups)) {
-            window.AppCleanups.forEach(fn => {
-                try { fn(); } catch {}
-            });
+            window.AppCleanups.forEach(fn => { try { fn(); } catch {} });
             window.AppCleanups = [];
         }
 
@@ -200,20 +49,16 @@
         appMount.innerHTML = '';
     }
 
-    /* LANGSUNG TERPENTAL KE HALAMAN LOGIN TANPA REFRESH */
-    function kickToLogin(reasonMessage, shouldBurnKeyId) {
-        if (shouldBurnKeyId) {
-            burnKey(shouldBurnKeyId);
-        }
-
+    function kickToLogin(reasonMessage) {
         localStorage.removeItem(STORAGE_SESSION);
+        activeKeyValue = '';
         cleanupApp();
 
         keyInput.value = '';
         loginBtn.disabled = false;
         loginBtn.textContent = 'Masuk';
         loginStatus.style.color = '#fe2c55';
-        loginStatus.textContent = reasonMessage || 'Sesi berakhir. Silakan masuk dengan Key baru.';
+        loginStatus.textContent = reasonMessage || 'Sesi berakhir.';
         loginScreen.style.display = 'flex';
     }
 
@@ -230,6 +75,7 @@
 
     async function unlockApp(rawKey, authInfo) {
         cleanupApp();
+        activeKeyValue = rawKey;
 
         loginScreen.style.display = 'none';
         appMount.appendChild(appTemplate.content.cloneNode(true));
@@ -238,8 +84,9 @@
         const logoutBtn = document.getElementById('logoutBtn');
 
         if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => {
-                kickToLogin('Anda telah keluar. Masukkan Key untuk masuk kembali.', null);
+            logoutBtn.addEventListener('click', async () => {
+                try { await callMemberApi('logout', activeKeyValue); } catch {}
+                kickToLogin('Anda telah keluar.');
             });
         }
 
@@ -254,10 +101,8 @@
 
             const remaining = authInfo.expiresAt - Date.now();
             if (remaining <= 0) {
-                kickToLogin(
-                    'Waktu Key sudah habis! Key hangus, silakan buat Key baru di GitHub.',
-                    authInfo.keyId
-                );
+                callMemberApi('heartbeat', rawKey).catch(() => {});
+                kickToLogin('Waktu Key sudah habis! Hubungi admin untuk Key baru.');
                 return;
             }
 
@@ -266,21 +111,18 @@
         }
 
         updateTimerDisplay();
-
-        /* Pantau tiap 1 detik: jika waktu habis, langsung terpental tanpa refresh */
         expiryWatchInterval = setInterval(updateTimerDisplay, 1000);
 
-        /* Cek status keys.json di GitHub setiap 20 detik */
-        remoteCheckInterval = setInterval(async () => {
+        heartbeatInterval = setInterval(async () => {
             try {
-                const check = await validateKeyFromGitHub(rawKey);
+                const check = await callMemberApi('heartbeat', rawKey);
                 if (!check.valid) {
-                    kickToLogin(check.message, null);
+                    kickToLogin(check.message || 'Key dinonaktifkan atau sudah habis.');
+                } else if (check.expiresAt) {
+                    authInfo.expiresAt = check.expiresAt;
                 }
-            } catch {
-                // Abaikan jika koneksi internet sempat putus sesaat
-            }
-        }, 20000);
+            } catch {}
+        }, 15000);
 
         await loadScript('js/gift-banner.js');
         await loadScript('js/media.js');
@@ -288,9 +130,20 @@
         await loadScript('js/payment.js');
     }
 
-    loginForm.addEventListener('submit', async (e) => {
+    window.addEventListener('beforeunload', () => {
+        if (activeKeyValue && navigator.sendBeacon) {
+            const blob = new Blob(
+                [JSON.stringify({ action: 'logout', key: activeKeyValue })],
+                { type: 'application/json' }
+            );
+            navigator.sendBeacon('/api/member', blob);
+        }
+    });
+
+    loginForm.addEventListener('submit', async e => {
         e.preventDefault();
         const inputKey = keyInput.value.trim();
+        if (!inputKey) return;
 
         loginBtn.disabled = true;
         loginBtn.textContent = 'Memeriksa Key...';
@@ -298,16 +151,15 @@
         loginStatus.textContent = '';
 
         try {
-            const res = await validateKeyFromGitHub(inputKey);
+            const res = await callMemberApi('login', inputKey);
             if (!res.valid) {
-                loginStatus.textContent = res.message;
+                loginStatus.textContent = res.message || 'Key tidak valid.';
                 return;
             }
-
             localStorage.setItem(STORAGE_SESSION, inputKey);
             await unlockApp(inputKey, res);
-        } catch (err) {
-            loginStatus.textContent = err.message || 'Terjadi kesalahan koneksi.';
+        } catch {
+            loginStatus.textContent = 'Gagal terhubung ke server.';
         } finally {
             loginBtn.disabled = false;
             loginBtn.textContent = 'Masuk';
@@ -319,21 +171,21 @@
         if (!savedKey) return;
 
         loginStatus.style.color = '#666';
-        loginStatus.textContent = 'Memverifikasi sesi tersimpan...';
+        loginStatus.textContent = 'Memverifikasi sesi...';
         loginBtn.disabled = true;
 
         try {
-            const res = await validateKeyFromGitHub(savedKey);
+            const res = await callMemberApi('login', savedKey);
             if (res.valid) {
                 await unlockApp(savedKey, res);
             } else {
                 localStorage.removeItem(STORAGE_SESSION);
                 loginStatus.style.color = '#fe2c55';
-                loginStatus.textContent = res.message;
+                loginStatus.textContent = res.message || 'Sesi berakhir.';
             }
         } catch {
             loginStatus.style.color = '#fe2c55';
-            loginStatus.textContent = 'Gagal memverifikasi sesi. Silakan login ulang.';
+            loginStatus.textContent = 'Gagal memverifikasi sesi.';
         } finally {
             loginBtn.disabled = false;
         }
