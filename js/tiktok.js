@@ -513,4 +513,11 @@
             accountStatus.style.display = 'none';
         }
     };
+
+    if (Array.isArray(window.AppCleanups)) {
+        window.AppCleanups.push(() => {
+            clearTimeout(detectTimer);
+            requestNumber++;
+        });
+    }
 })();
