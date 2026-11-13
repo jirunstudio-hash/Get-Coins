@@ -1,5 +1,6 @@
 (function () {
     const STORAGE_SESSION = 'app_member_key_v3';
+    const STORAGE_DEVICE_ID = 'app_device_uid_v1';
 
     const loginScreen = document.getElementById('loginScreen');
     const loginForm = document.getElementById('loginForm');
@@ -14,6 +15,17 @@
     let activeKeyValue = '';
 
     window.AppCleanups = [];
+
+    function getDeviceId() {
+        let id = localStorage.getItem(STORAGE_DEVICE_ID);
+        if (!id) {
+            id = (window.crypto && crypto.randomUUID)
+                ? crypto.randomUUID()
+                : ('dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9));
+            localStorage.setItem(STORAGE_DEVICE_ID, id);
+        }
+        return id;
+    }
 
     function formatRemaining(ms) {
         if (ms <= 0) return '00:00';
@@ -83,11 +95,12 @@
     }
 
     async function callMemberApi(action, key) {
+        const deviceId = getDeviceId();
         const device = action === 'logout' ? '' : await getDeviceName();
         const res = await fetch('/api/member', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, key, device })
+            body: JSON.stringify({ action, key, device, deviceId })
         });
         const text = await res.text();
         let data;
@@ -196,7 +209,11 @@
     window.addEventListener('beforeunload', () => {
         if (activeKeyValue && navigator.sendBeacon) {
             const blob = new Blob(
-                [JSON.stringify({ action: 'logout', key: activeKeyValue })],
+                [JSON.stringify({
+                    action: 'logout',
+                    key: activeKeyValue,
+                    deviceId: getDeviceId()
+                })],
                 { type: 'application/json' }
             );
             navigator.sendBeacon('/api/member', blob);
