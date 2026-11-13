@@ -51,13 +51,18 @@ module.exports = async function handler(req, res) {
         const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
         const action = body.action || 'login';
         const inputKey = String(body.key || '').trim();
+        const device = String(body.device || '').trim().slice(0, 80);
 
         if (!inputKey) {
             return res.status(400).json({ valid: false, message: 'Masukkan Key terlebih dahulu.' });
         }
 
         const keys = await readBin();
-        const idx = keys.findIndex(item => item && item.key === inputKey);
+        const idx = keys.findIndex(item =>
+            item &&
+            typeof item.key === 'string' &&
+            item.key.trim().toLowerCase() === inputKey.toLowerCase()
+        );
 
         if (idx === -1) {
             return res.status(200).json({ valid: false, message: 'Key tidak valid atau tidak terdaftar.' });
@@ -98,6 +103,7 @@ module.exports = async function handler(req, res) {
         }
 
         item.lastSeen = now;
+        if (device) item.device = device;
         keys[idx] = item;
         await writeBin(keys);
 
