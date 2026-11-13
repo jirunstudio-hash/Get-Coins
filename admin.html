@@ -26,14 +26,21 @@ input, select, button { font-size: 14px; border-radius: 8px; }
 .key-row { display: flex; gap: 8px; }
 .btn-random { border: 1px solid #ddd; background: #f8f8f8; padding: 0 12px; height: 42px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; }
 
-.member-item { border: 1px solid #eee; border-radius: 10px; padding: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
-.member-info h4 { font-size: 14px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+.member-item { border: 1px solid #eee; border-radius: 10px; padding: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.member-info { flex: 1; min-width: 220px; }
+.member-info h4 { font-size: 14px; margin-bottom: 5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .badge { font-size: 10px; padding: 2px 8px; border-radius: 99px; font-weight: 700; }
 .badge-on { background: #e6f9f0; color: #00a870; }
 .badge-off { background: #f1f1f2; color: #777; }
 .badge-exp { background: #ffe8ed; color: #fe2c55; }
+.badge-warn { background: #fff3cd; color: #b76e00; }
 .member-meta { font-size: 12px; color: #555; line-height: 1.65; }
 .member-meta code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; font-weight: 600; color: #222; }
+.device-list { margin-top: 6px; padding: 7px 9px; background: #fafafa; border: 1px solid #efefef; border-radius: 8px; font-size: 11px; line-height: 1.7; }
+.device-row { display: flex; align-items: center; gap: 6px; }
+.device-row strong { color: #222; }
+.device-state-on { color: #00a870; font-weight: 700; }
+.device-state-off { color: #888; }
 .member-actions { display: flex; gap: 6px; }
 .btn-sm { border: none; padding: 7px 11px; font-size: 12px; font-weight: 600; cursor: pointer; border-radius: 6px; }
 .btn-toggle { background: #eef4ff; color: #0066cc; }
@@ -145,9 +152,13 @@ function renderList() {
         const div = document.createElement('div');
         div.className = 'member-item';
 
-        const statusBadge = item.isOnline
-            ? '<span class="badge badge-on">ON</span>'
-            : '<span class="badge badge-off">OFF</span>';
+        const onlineCount = Number(item.onlineCount || 0);
+        let statusBadge = '<span class="badge badge-off">OFF</span>';
+        if (onlineCount >= 2) {
+            statusBadge = `<span class="badge badge-on">ON (${onlineCount} Perangkat)</span> <span class="badge badge-warn">⚠️ ${onlineCount} HP Barengan</span>`;
+        } else if (onlineCount === 1) {
+            statusBadge = '<span class="badge badge-on">ON (1 Perangkat)</span>';
+        }
 
         let keyStateBadge = '';
         if (item.isExpired) {
@@ -167,14 +178,28 @@ function renderList() {
             }
         }
 
+        const sessions = Array.isArray(item.sessions) ? item.sessions : [];
+        let devicesHtml = '<span style="color:#888;">Belum ada perangkat login</span>';
+        if (sessions.length > 0) {
+            devicesHtml = sessions.map((s, i) => {
+                const dot = s.isOnline ? '🟢' : '⚫';
+                const stateTxt = s.isOnline
+                    ? '<span class="device-state-on">(Sedang ON)</span>'
+                    : '<span class="device-state-off">(OFF)</span>';
+                return `<div class="device-row">${dot} <span>#${i + 1}</span> <strong>${escapeHtml(s.device)}</strong> ${stateTxt}</div>`;
+            }).join('');
+        }
+
         const info = document.createElement('div');
         info.className = 'member-info';
         info.innerHTML = `
             <h4>${escapeHtml(item.name)} ${statusBadge} ${keyStateBadge}</h4>
             <div class="member-meta">
-                Key: <code>${escapeHtml(item.key)}</code><br>
-                Perangkat: <strong>${escapeHtml(item.device || '-')}</strong><br>
-                Durasi: <strong>${durasiText}</strong>
+                Key: <code>${escapeHtml(item.key)}</code> &nbsp;•&nbsp; Durasi: <strong>${durasiText}</strong>
+                <div class="device-list">
+                    <div style="font-weight:600;margin-bottom:2px;color:#444;">Perangkat terdeteksi (${sessions.length}):</div>
+                    ${devicesHtml}
+                </div>
             </div>
         `;
 
