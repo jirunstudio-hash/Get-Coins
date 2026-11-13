@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard - Key Manager</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: Roboto, Arial, sans-serif; }
+body { background: #f0f2f5; color: #222; min-height: 100vh; padding: 16px; }
+.login-wrap { max-width: 380px; margin: 60px auto; background: #fff; padding: 26px 20px; border-radius: 14px; box-shadow: 0 4px 20px #0001; text-align: center; }
+.login-wrap h2 { font-size: 20px; margin-bottom: 6px; }
+.login-wrap p { font-size: 13px; color: #666; margin-bottom: 16px; }
+input, select, button { font-size: 14px; border-radius: 8px; }
+.input-field { width: 100%; height: 42px; padding: 0 12px; border: 1.5px solid #ddd; outline: none; margin-bottom: 10px; }
+.input-field:focus { border-color: #fe2c55; }
+.btn-primary { width: 100%; height: 42px; border: none; background: #fe2c55; color: #fff; font-weight: 600; cursor: pointer; }
+.status-err { color: #fe2c55; font-size: 12px; margin-top: 10px; min-height: 16px; }
+
+.dash { max-width: 720px; margin: auto; display: none; }
+.dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.dash-header h1 { font-size: 20px; }
+.btn-logout { border: 1px solid #ddd; background: #fff; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.card { background: #fff; padding: 16px; border-radius: 12px; box-shadow: 0 2px 10px #0001; margin-bottom: 14px; }
+.card h3 { font-size: 15px; margin-bottom: 12px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.key-row { display: flex; gap: 8px; }
+.btn-random { border: 1px solid #ddd; background: #f8f8f8; padding: 0 12px; height: 42px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+.member-item { border: 1px solid #eee; border-radius: 10px; padding: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.member-info h4 { font-size: 14px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+.badge { font-size: 10px; padding: 2px 8px; border-radius: 99px; font-weight: 700; }
+.badge-on { background: #e6f9f0; color: #00a870; }
+.badge-off { background: #f1f1f2; color: #777; }
+.badge-exp { background: #ffe8ed; color: #fe2c55; }
+.member-meta { font-size: 12px; color: #555; line-height: 1.6; }
+.member-meta code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; font-weight: 600; color: #222; }
+.member-actions { display: flex; gap: 6px; }
+.btn-sm { border: none; padding: 7px 11px; font-size: 12px; font-weight: 600; cursor: pointer; border-radius: 6px; }
+.btn-toggle { background: #eef4ff; color: #0066cc; }
+.btn-del { background: #ffe8ed; color: #fe2c55; }
+
+@media (max-width: 540px) { .form-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="login-wrap" id="adminLogin">
+    <h2>Admin Dashboard</h2>
+    <p>Masukkan Key Admin untuk mengelola member</p>
+    <form id="adminLoginForm">
+        <input type="password" id="adminKeyInput" class="input-field" placeholder="Masukkan Key Admin" required>
+        <button type="submit" class="btn-primary" id="adminLoginBtn">Masuk Dasbor</button>
+    </form>
+    <p class="status-err" id="adminLoginErr"></p>
+</div>
+
+<div class="dash" id="adminDash">
+    <div class="dash-header">
+        <h1>Dasbor Member & Key</h1>
+        <button class="btn-logout" id="adminLogoutBtn">Keluar</button>
+    </div>
+
+    <div class="card">
+        <h3>Buat Key Baru</h3>
+        <form id="createKeyForm">
+            <div class="form-grid">
+                <input type="text" id="newName" class="input-field" placeholder="Nama Member (misal: Andi)" required>
+                <select id="newDuration" class="input-field">
+                    <option value="1m">1 Menit (1m)</option>
+                    <option value="1h" selected>1 Jam (1h)</option>
+                    <option value="24h">24 Jam (24h)</option>
+                    <option value="permanent">Permanen</option>
+                </select>
+            </div>
+            <div class="key-row">
+                <input type="text" id="newKey" class="input-field" placeholder="Kode Key (atau klik Acak)" required>
+                <button type="button" class="btn-random" id="randomKeyBtn">Acak Key</button>
+            </div>
+            <button type="submit" class="btn-primary" id="createBtn">Simpan Key ke JSONBin</button>
+        </form>
+        <p class="status-err" id="createErr"></p>
+    </div>
+
+    <div class="card">
+        <h3>Daftar Member (<span id="totalCount">0</span>)</h3>
+        <div id="memberList">Memuat data...</div>
+    </div>
+</div>
+
+<script>
+const ADMIN_STORAGE = 'admin_dash_key_v1';
+let currentAdminKey = sessionStorage.getItem(ADMIN_STORAGE) || '';
+let cachedKeys = [];
+let refreshTimer = null;
+let tickTimer = null;
+
+const adminLogin = document.getElementById('adminLogin');
+const adminDash = document.getElementById('adminDash');
+const adminLoginErr = document.getElementById('adminLoginErr');
+const memberListEl = document.getElementById('memberList');
+const totalCountEl = document.getElementById('totalCount');
+
+async function callAdminApi(payload) {
+    const res = await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminKey: currentAdminKey, ...payload })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+        throw new Error(data.message || 'Gagal memproses permintaan.');
+    }
+    return data;
+}
+
+function formatRemaining(ms) {
+    if (ms <= 0) return '00:00';
+    const totalSec = Math.ceil(ms / 1000);
+    const hrs = Math.floor(totalSec / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+    if (hrs > 0) {
+        return String(hrs).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    }
+    return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+}
+
+function renderList() {
+    totalCountEl.textContent = cachedKeys.length;
+    if (cachedKeys.length === 0) {
+        memberListEl.innerHTML = '<p style="font-size:13px;color:#777;">Belum ada Key dibuat.</p>';
+        return;
+    }
+
+    const now = Date.now();
+    memberListEl.innerHTML = '';
+
+    cachedKeys.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'member-item';
+
+        const statusBadge = item.isOnline
+            ? '<span class="badge badge-on">ON</span>'
+            : '<span class="badge badge-off">OFF</span>';
+
+        let keyStateBadge = '';
+        if (item.isExpired) {
+            keyStateBadge = '<span class="badge badge-exp">HABIS</span>';
+        } else if (!item.active) {
+            keyStateBadge = '<span class="badge badge-exp">NONAKTIF</span>';
+        }
+
+        let durasiText = 'Permanen';
+        if (item.duration !== 'permanent') {
+            if (!item.startedAt) {
+                durasiText = 'Belum dipakai (' + item.duration + ')';
+            } else if (item.expiresAt && now < item.expiresAt) {
+                durasiText = 'Sisa ' + formatRemaining(item.expiresAt - now);
+            } else {
+                durasiText = 'Waktu habis';
+            }
+        }
+
+        const info = document.createElement('div');
+        info.className = 'member-info';
+        info.innerHTML = `
+            <h4>${escapeHtml(item.name)} ${statusBadge} ${keyStateBadge}</h4>
+            <div class="member-meta">
+                Key: <code>${escapeHtml(item.key)}</code><br>
+                Durasi: <strong>${durasiText}</strong>
+            </div>
+        `;
+
+        const actions = document.createElement('div');
+        actions.className = 'member-actions';
+
+        if (!item.isExpired) {
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'btn-sm btn-toggle';
+            toggleBtn.textContent = item.active ? 'Nonaktifkan' : 'Aktifkan';
+            toggleBtn.onclick = async () => {
+                try {
+                    const data = await callAdminApi({ action: 'toggle', id: item.id });
+                    cachedKeys = data.keys;
+                    renderList();
+                } catch (err) { alert(err.message); }
+            };
+            actions.appendChild(toggleBtn);
+        }
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn-sm btn-del';
+        delBtn.textContent = 'Hapus';
+        delBtn.onclick = async () => {
+            if (!confirm('Hapus Key milik ' + item.name + '?')) return;
+            try {
+                const data = await callAdminApi({ action: 'delete', id: item.id });
+                cachedKeys = data.keys;
+                renderList();
+            } catch (err) { alert(err.message); }
+        };
+        actions.appendChild(delBtn);
+
+        div.appendChild(info);
+        div.appendChild(actions);
+        memberListEl.appendChild(div);
+    });
+}
+
+function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[m]));
+}
+
+async function fetchList() {
+    try {
+        const data = await callAdminApi({ action: 'list' });
+        cachedKeys = data.keys;
+        renderList();
+    } catch {}
+}
+
+async function openDashboard() {
+    const data = await callAdminApi({ action: 'list' });
+    cachedKeys = data.keys;
+    adminLogin.style.display = 'none';
+    adminDash.style.display = 'block';
+    renderList();
+
+    clearInterval(refreshTimer);
+    clearInterval(tickTimer);
+    refreshTimer = setInterval(fetchList, 5000);
+    tickTimer = setInterval(renderList, 1000);
+}
+
+document.getElementById('adminLoginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    currentAdminKey = document.getElementById('adminKeyInput').value.trim();
+    adminLoginErr.textContent = '';
+
+    try {
+        await openDashboard();
+        sessionStorage.setItem(ADMIN_STORAGE, currentAdminKey);
+    } catch (err) {
+        currentAdminKey = '';
+        adminLoginErr.textContent = err.message;
+    }
+});
+
+document.getElementById('adminLogoutBtn').addEventListener('click', () => {
+    sessionStorage.removeItem(ADMIN_STORAGE);
+    clearInterval(refreshTimer);
+    clearInterval(tickTimer);
+    currentAdminKey = '';
+    adminDash.style.display = 'none';
+    adminLogin.style.display = 'block';
+    document.getElementById('adminKeyInput').value = '';
+});
+
+document.getElementById('randomKeyBtn').addEventListener('click', () => {
+    const rand = 'KEY-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    document.getElementById('newKey').value = rand;
+});
+
+document.getElementById('createKeyForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const createErr = document.getElementById('createErr');
+    createErr.textContent = '';
+
+    try {
+        const data = await callAdminApi({
+            action: 'create',
+            name: document.getElementById('newName').value.trim(),
+            key: document.getElementById('newKey').value.trim(),
+            duration: document.getElementById('newDuration').value
+        });
+        cachedKeys = data.keys;
+        renderList();
+        document.getElementById('newName').value = '';
+        document.getElementById('newKey').value = '';
+    } catch (err) {
+        createErr.textContent = err.message;
+    }
+});
+
+if (currentAdminKey) {
+    openDashboard().catch(() => {
+        sessionStorage.removeItem(ADMIN_STORAGE);
+        currentAdminKey = '';
+    });
+}
+</script>
+</body>
+</html>
