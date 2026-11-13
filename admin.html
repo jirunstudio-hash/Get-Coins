@@ -32,7 +32,7 @@ input, select, button { font-size: 14px; border-radius: 8px; }
 .badge-on { background: #e6f9f0; color: #00a870; }
 .badge-off { background: #f1f1f2; color: #777; }
 .badge-exp { background: #ffe8ed; color: #fe2c55; }
-.member-meta { font-size: 12px; color: #555; line-height: 1.6; }
+.member-meta { font-size: 12px; color: #555; line-height: 1.65; }
 .member-meta code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; font-weight: 600; color: #222; }
 .member-actions { display: flex; gap: 6px; }
 .btn-sm { border: none; padding: 7px 11px; font-size: 12px; font-weight: 600; cursor: pointer; border-radius: 6px; }
@@ -106,7 +106,13 @@ async function callAdminApi(payload) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminKey: currentAdminKey, ...payload })
     });
-    const data = await res.json();
+    const text = await res.text();
+    let data;
+    try {
+        data = JSON.parse(text);
+    } catch {
+        throw new Error('Server /api/admin tidak ditemukan (HTTP ' + res.status + ').');
+    }
     if (!res.ok || !data.ok) {
         throw new Error(data.message || 'Gagal memproses permintaan.');
     }
@@ -167,6 +173,7 @@ function renderList() {
             <h4>${escapeHtml(item.name)} ${statusBadge} ${keyStateBadge}</h4>
             <div class="member-meta">
                 Key: <code>${escapeHtml(item.key)}</code><br>
+                Perangkat: <strong>${escapeHtml(item.device || '-')}</strong><br>
                 Durasi: <strong>${durasiText}</strong>
             </div>
         `;
